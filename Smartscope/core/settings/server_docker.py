@@ -27,7 +27,7 @@ TEMPDIR = os.getenv('TEMPDIR')
 
 SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = os.getenv('DEBUG')
-DEPLOY = True
+DEPLOY = False
 
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
@@ -87,7 +87,10 @@ ROOT_URLCONF = 'Smartscope.server.main.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, '../server/main/custom_templates'), os.path.join(BASE_DIR, '../server/main/templates')],
+        'DIRS': [
+            os.path.join(BASE_DIR, '../server/main/custom_templates'),
+            os.path.join(BASE_DIR, '../server/main/templates')
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -111,7 +114,10 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [(os.getenv("REDIS_HOST"), int(os.getenv("REDIS_PORT")))],
+            "hosts": [
+                (os.getenv("REDIS_HOST"), 
+                int(os.getenv("REDIS_PORT")))
+            ],
         },
     },
 }
@@ -127,11 +133,14 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': os.getenv('MYSQL_DATABASE'),
+        'USER': os.environ.get("MYSQL_USER"),
         'PASSWORD': os.getenv('MYSQL_ROOT_PASSWORD'),
-
+        'HOST': os.environ.get("MYSQL_HOST"),
+        'PORT': '3306',
         'CONN_MAX_AGE': 0,
     }
 }
+
 if os.getenv('MYSQL_HOST') == 'localhost':
     DATABASES['default']['OPTIONS'] = {
         'unix_socket': '/run/mysqld/mysqld.sock',
