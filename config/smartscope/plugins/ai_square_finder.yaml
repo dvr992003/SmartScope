@@ -4,9 +4,10 @@ module: Smartscope.tasks.base_tasks
 kwargs: 
   device: '0'
   imgsz: 1280
-  conf_thres: 0.5
-  iou_thres: 0.3
-  weights_circle: square_weights/20250307_yolo_square_finder.pth
+  conf_thres: 0.2
+  iou_thres: 0.1
+  agnostic: True
+  weights_circle: square_weights/best.pt
 targetClass:
   - Finder
   - Classifier
