@@ -42,12 +42,17 @@ APP = os.getenv('APP')
 USE_STORAGE = eval(os.getenv('USE_STORAGE', 'True'))
 USE_LONGTERMSTORAGE = eval(os.getenv('USE_LONGTERMSTORAGE', 'False'))
 USE_AWS = eval(os.getenv('USE_AWS',  'False'))
-USE_MICROSCOPE = eval(os.getenv('USE_MICROSCOPE', 'True'))
-
+SMARTSCOPE_ROLE = os.getenv('SMARTSCOPE_ROLE', 'acquisition')
 REDIS_HOST = os.getenv("REDIS_HOST",'localhost')
 REDIS_PORT = int(os.getenv("REDIS_PORT", '6379'))
 REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', None)
-
+_is_archive = SMARTSCOPE_ROLE == 'archive'
+if _is_archive:
+    USE_MICROSCOPE = False
+    SHOW_HIGHMAG = False
+else:
+    USE_MICROSCOPE = eval(os.getenv('USE_MICROSCOPE', 'True'))
+    SHOW_HIGHMAG = eval(os.getenv('SHOW_HIGHMAG', 'True'))
 if USE_LONGTERMSTORAGE:
     AUTOSCREENSTORAGE = os.getenv('AUTOSCREENSTORAGE')
 else:

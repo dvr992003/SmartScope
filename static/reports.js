@@ -234,9 +234,11 @@ async function loadSquare(full_id, metaonly = false, display_type = null, method
 async function loadHole(id, metaonly = false) {
     let data = await fetchAsync(`/api/holes/${id}/load`, message=`Loading Hole ${id}`)
     $("#mmHole").html(data.card)
-    hm_data = await fetchAsync(`/api/holes/${id}/highmag/?squareMethod=${currentState['squareMethod']}`, message=`Loading high mag data.`)
-    $('#Hole').html(hm_data)
-    grabCuration()
+    if (document.getElementById('Hole')) {
+        hm_data = await fetchAsync(`/api/holes/${id}/highmag/?squareMethod=${currentState['squareMethod']}`, message=`Loading high mag data.`)
+        $('#Hole').html(hm_data)
+        grabCuration()
+    }
 };
 
 function grabCuration() {
@@ -293,9 +295,9 @@ function rateGrid(el, gridId, value) {
     }
     const container = el.closest('.quality-controls');
     container.querySelectorAll('.quality-btn').forEach(btn => btn.classList.remove('active'));
-    
+
     apifetchAsync(url, { 'quality': value }, "PATCH", message=`Setting grid quality to ${value}`);
-    
+
     if (value != null) {
         el.classList.add('active');
     }
@@ -672,7 +674,8 @@ async function reportMain() {
     popupsele = null
     hmSelection = null
     targetsSelection = []
-    zoomedContentCln = document.getElementById('zoomedContent').cloneNode(true)
+    let _zc = document.getElementById('zoomedContent')
+    zoomedContentCln = _zc ? _zc.cloneNode(true) : null
     fullmeta = await loadMeta()
     populateReportHead()
     // renderCounts()
@@ -781,7 +784,7 @@ async function submitExtendLatticeForm() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRFToken': csrftoken, 
+                'X-CSRFToken': csrftoken,
             },
             body: JSON.stringify(formData),
         });
@@ -925,7 +928,7 @@ function scrollToOtherCard(inc) {
     let current_position = elem.scrollLeft()
     let new_position = current_position + elem_size * inc
     console.log('Moving by', elem_size, 'to', new_position)
-    elem.animate({'scrollLeft': new_position}, 500); 
+    elem.animate({'scrollLeft': new_position}, 500);
 }
 
 $(document).keydown(function(e){
@@ -943,7 +946,7 @@ $(document).keydown(function(e){
         inc = -1
     }
     let elem = $('.holeCard.popupFull')
-    
+
     if (elem.length != 0) {
         zoomOnOtherCard(elem, inc)
         return
@@ -977,9 +980,9 @@ function updateData(data) {
 
 /**
  * This code allows to draw a line over the "Square_im" element
- * inside the "square_div" container. It calculates and displays 
+ * inside the "square_div" container. It calculates and displays
  * the angle of the drawn line relative to the horizontal axis.
- 
+
  Step 1: Capture mouse events on "square_im"
  Step 2: Draw a line dynamically and a horizontal reference axis
  Step 3: Compute the angle of rotation
@@ -991,7 +994,7 @@ let isDrawing = false;
 let isDrawingEnabled = false;
 let timeoutId = null;
 
-// this code allows to draw over click of angleMeasure 
+// this code allows to draw over click of angleMeasure
 $(document).on("click", "#angleMeasure", function () {
     isDrawingEnabled = !isDrawingEnabled;
     console.log("Drawing Mode:", isDrawingEnabled);
@@ -1002,7 +1005,7 @@ $(document).on("click", "#angleMeasure", function () {
     }
 });
 
-// this code captures the starting coordinates on mouse down 
+// this code captures the starting coordinates on mouse down
 $('#main').on("mousedown", '#Square_div svg', function (event) {
     if (!isDrawingEnabled) return;
 
@@ -1026,7 +1029,7 @@ $('#main').on("mousedown", '#Square_div svg', function (event) {
     line.setAttribute("stroke-width", "10");
     svg.appendChild(line);
 
-    // initiates horizontal reference line 
+    // initiates horizontal reference line
     let hAxis = document.createElementNS("http://www.w3.org/2000/svg", 'line');
     hAxis.setAttribute("id", "horizontalAxis");
     hAxis.setAttribute("x1", lineStartX);
@@ -1130,7 +1133,7 @@ function calculateAngleAnticlockwise(x1, y1, x2, y2) {
 // function to update arc, horizontal axis grows same as drawn line
 function updateArcPath(x1, y1, x2, y2) {
     let radius = 150; // Offset arc 150px away from center
-    let angle = calculateAngleAnticlockwise(x1, y1, x2, y2); // 
+    let angle = calculateAngleAnticlockwise(x1, y1, x2, y2); //
 
     // Extend horizontal axis dynamically to match drawn line length
     let hAxisLength = Math.abs(x2 - x1);
@@ -1152,21 +1155,21 @@ function updateArcPath(x1, y1, x2, y2) {
 function downloadPNG(element_id,image_name="downloaded-image") {
     const svg = document.getElementById(element_id);
     const svgData = new XMLSerializer().serializeToString(svg);
-  
+
     const svgBlob = new Blob([svgData], { type: "image/svg+xml;charset=utf-8" });
     const url = URL.createObjectURL(svgBlob);
-  
+
     const img = new Image();
     img.onload = function () {
       const canvas = document.createElement("canvas");
       canvas.width = svg.width.baseVal.value;
       canvas.height = svg.height.baseVal.value;
-  
+
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0);
-  
+
       URL.revokeObjectURL(url); // Clean up
-  
+
       // Create a link to download the image
       const pngUrl = canvas.toDataURL("image/png");
       const downloadLink = document.createElement("a");
@@ -1174,7 +1177,7 @@ function downloadPNG(element_id,image_name="downloaded-image") {
       downloadLink.download = `${image_name}.png`;
       downloadLink.click();
     };
-  
+
     img.src = url;
   }
 
@@ -1194,6 +1197,38 @@ function clearExistingLines() {
     if (timeoutId) {
         clearTimeout(timeoutId);
         timeoutId = null;
+    }
+}
+
+async function downloadExport(gridId, filename) {
+    const btn = document.getElementById('exportBtn');
+    const label = btn.innerHTML;
+    btn.classList.add('disabled');
+    btn.innerHTML = 'Preparing…';
+    try {
+        const resp = await fetch(`/api/grids/${gridId}/export_optimized/`);
+        if (!resp.ok) throw new Error(resp.status);
+        const total = +resp.headers.get('Content-Length');
+        const reader = resp.body.getReader();
+        const chunks = [];
+        let received = 0;
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.length;
+            btn.innerHTML = total ? `Downloading ${Math.round(received / total * 100)}%`
+                                  : `Downloading ${(received / 1e6).toFixed(1)} MB`;
+        }
+        const url = URL.createObjectURL(new Blob(chunks));
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('Error during download: ' + e);
+    } finally {
+        btn.classList.remove('disabled');
+        btn.innerHTML = label;
     }
 }
 

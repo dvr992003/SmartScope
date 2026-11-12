@@ -15,6 +15,7 @@
             <div class='col-5 pr-0'><b>Exposures acquired:</b></div>
             <div id='holeCountAcquired' class='col-auto pl-0'>{{completed}}</div>
         </div>
+        {% if USE_MICROSCOPE %}
         <div class='row'>
             <div class='col-5 pr-0'><b>Exposures per hour:</b></div>
             <div id='holeCountPerhour' class='col-auto pl-0'>{{perhour}}</div>
@@ -31,6 +32,7 @@
             <div class='col-5 pr-0'><b>Estimated time remaining:</b></div>
             <div id='holeLasthour' class='col-auto pl-0'>{{remaining}}</div>
         </div>
+        {% endif %}
         {{graph|safe}}
         {{ice_thickness_graph|safe}}
     </div>

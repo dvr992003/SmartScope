@@ -231,6 +231,8 @@ class ReportPanel(APIView):
                                                                                     'mode': grid.collection_mode}
                                                                             )
             context['useMicroscope'] = settings.USE_MICROSCOPE
+            context['showHighmag'] = settings.SHOW_HIGHMAG
+            context['isArchive'] = settings.SMARTSCOPE_ROLE == 'archive'
             try:
                 context['atlas_id'] = context['grid'].atlasmodel_set.all().first().atlas_id
             except:

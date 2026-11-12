@@ -500,6 +500,7 @@ class CollectionStatsView(TemplateView):
             15,
             'CTF fit distribution',
             'CTF fit resolution (Angstrom)'
+
         )
         return graph
     

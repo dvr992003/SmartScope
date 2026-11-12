@@ -36,6 +36,9 @@ from Smartscope.core.models import *
 from Smartscope.core.settings.worker import PLUGINS_FACTORY
 from Smartscope.core.main_commands import check_pause
 
+import zipfile
+from rest_framework_yaml.renderers import YAMLRenderer
+
 logger = logging.getLogger(__name__)
 
 
@@ -63,7 +66,7 @@ class GeneralActionsMixin:
         logger.debug(queryset)
         queryset.delete()
         return Response(status=rest_status.HTTP_204_NO_CONTENT)
-    
+
     @action(detail=False, methods=['post'])
     def post_many(self, request, *args, **kwargs):
         logger.debug('Received post_many request')
@@ -81,7 +84,7 @@ class GeneralActionsMixin:
         except Exception as err:
             logger.exception(f'Error while posting many, {err}.')
             return Response(serializer.errors, status=rest_status.HTTP_400_BAD_REQUEST)
-        
+
 class ExtraActionsMixin:
 
     def load(self, request, **kwargs):
@@ -89,11 +92,11 @@ class ExtraActionsMixin:
         serializer = SvgSerializer(instance=obj, context={'request': request})
         context = serializer.data
         return Response(serializer.data, template_name='mapcard.html')
-    
+
     def get_card_context(self,instance,request,**kwargs):
         if isinstance(instance, HighMagModel):
             return {}
-        
+
         context = {
             'instance': instance,
             'targets_methods': targets_methods(instance),
@@ -174,7 +177,7 @@ class TargetRouteMixin:
             return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-        
+
         serializer = self.get_serializer(page, many=True)
         return self.get_paginated_response(serializer.data)
 
@@ -188,7 +191,7 @@ class TargetRouteMixin:
             self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
+
     @ action(detail=False, methods=['get'], url_path='scipion_plugin')
     def scipion_plugin(self, request, *args, **kwargs):
         reset_queries()
@@ -220,8 +223,8 @@ class TargetRouteMixin:
         except Exception as err:
             logger.exception(f'Error while posting many, {err}.')
             return Response(serializer.errors, status=rest_status.HTTP_400_BAD_REQUEST)
-        
-    @action(detail=False, methods=['patch'])    
+
+    @action(detail=False, methods=['patch'])
     def update_many(self,request, *args, **kwargs):
         logger.debug('Received update_many request')
         logger.debug(request.data)
@@ -238,11 +241,11 @@ class TargetRouteMixin:
         except Exception as err:
             logger.exception(f'Error while updating many, {err}.')
             return Response(err, status=rest_status.HTTP_400_BAD_REQUEST)
-        
+
     def detailed_patch(self,request,*args,**kwargs):
         return self.partial_update(request, *args, **kwargs)
 
-          
+
 
 class UserViewSet(viewsets.ModelViewSet, GeneralActionsMixin,):
     """
@@ -413,13 +416,13 @@ class ScreeningSessionsViewSet(viewsets.ModelViewSet, GeneralActionsMixin,):
             os.path.join('/tmp/', f'{self.object.microscope_id.pk}.lock')], communicate=True)
         logger.info(f'OUTPUT: {out}\nERROR: {err}')
         return Response(dict(out=out, err=err))
-    
+
     @action(detail=True, methods=['get'])
     def download_logs(self, request, pk=None):
         """
-        Handles the download of specific log files ('run.out' or 'proc.out') 
-        for a given session. The file type is determined by the 'file_type' 
-        parameter in the request. If the file exists, it is served as an 
+        Handles the download of specific log files ('run.out' or 'proc.out')
+        for a given session. The file type is determined by the 'file_type'
+        parameter in the request. If the file exists, it is served as an
         attachment for download; otherwise, a 404 error is raised.
 
         Args:
@@ -432,7 +435,7 @@ class ScreeningSessionsViewSet(viewsets.ModelViewSet, GeneralActionsMixin,):
         Raises:
             Http404: If the file type is invalid or the file does not exist.
         """
-        # Get the session instance 
+        # Get the session instance
         session = self.get_object()
 
         # Determine the file based on the 'file_type' parameter in the request
@@ -452,8 +455,8 @@ class ScreeningSessionsViewSet(viewsets.ModelViewSet, GeneralActionsMixin,):
             return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
         else:
             raise Http404("File not found")
-        
-        
+
+
 
     def read_file(self, name, start_line=-100):
         try:
@@ -619,6 +622,31 @@ class AutoloaderGridViewSet(viewsets.ModelViewSet, GeneralActionsMixin, ExtraAct
         self.serializer_class = ExportMetaSerializer
         serializer = self.get_serializer(obj, many=False)
         return Response(data=serializer.data)
+
+    @action(detail=True, methods=['get'], url_path='export_optimized')
+    def export_optimized(self, request, *args, **kwargs):
+        obj = self.get_object()
+        try:
+            grid_dir = obj.directory
+        except Exception:
+            grid_dir = None
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_STORED) as zf:
+            yaml_path = os.path.join(grid_dir, 'export.yaml') if grid_dir else None
+            if yaml_path and os.path.isfile(yaml_path):
+                zf.write(yaml_path, 'export.yaml')  # rápido: fichero del store
+            else:
+                zf.writestr('export.yaml',
+                            YAMLRenderer().render(data=ExportMetaSerializer(instance=obj).data))  # fallback: serializa
+            pngs_dir = os.path.join(grid_dir, 'pngs') if grid_dir else None
+            if pngs_dir and os.path.isdir(pngs_dir):
+                for fname in sorted(os.listdir(pngs_dir)):
+                    fpath = os.path.join(pngs_dir, fname)
+                    if os.path.isfile(fpath):
+                        zf.write(fpath, arcname=os.path.join('pngs', fname))
+        buffer.seek(0)
+        filename = f'{obj.session_id.working_directory}_{obj.position}_{obj.name}.zip'
+        return FileResponse(buffer, as_attachment=True, filename=filename, content_type='application/zip')
     
 
     @action(detail=True, methods=['get'])
