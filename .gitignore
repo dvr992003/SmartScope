@@ -64,3 +64,19 @@ static/rest_framework/
 testfiles.old/
 redis.conf
 uv.lock
+# IDE
+.idea/
+
+# Docker runtime data — nunca versionar
+Docker/SmartScope/db/
+Docker/SmartScope/optimized_store/
+Docker/SmartScope/backups/
+Docker/SmartScope/scratch/
+
+# IDE
+.idea/
+# Docker runtime data — nunca versionar
+Docker/SmartScope/db/
+Docker/SmartScope/optimized_store/
+Docker/SmartScope/backups/
+Docker/SmartScope/scratch/
