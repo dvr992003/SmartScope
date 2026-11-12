@@ -11,6 +11,7 @@
                     <i class="bi bi-list-nested" ></i>
                 </button>
             </li>
+            {% if useMicroscope %}
             <li class="list-group-item p-1" data-bs-toggle="tooltip" title="View microscope(s) status and current sessions">
                 <button id="microscopeActivity"
                     class="btn btn-sm btn-outline-light"
@@ -20,6 +21,7 @@
                     <i class="bi bi-activity"></i>
                 </button>
             </li>
+            {% endif %}
             <li class="list-group-item p-1" data-bs-toggle="tooltip" title="View all sesssions">
                 <button id="sessionHistory"
                     class="btn btn-sm btn-outline-light"

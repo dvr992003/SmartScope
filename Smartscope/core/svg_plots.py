@@ -1,3 +1,4 @@
+import os
 import drawsvg as draw
 from math import floor, sqrt
 from Smartscope.core.settings.worker import PLUGINS_FACTORY
@@ -358,16 +359,26 @@ def drawMediumMag(hole, targets, display_type, method, **kwargs) -> draw.Drawing
     d.append(add_legend(set(labels_list), d.width, d.height, hole.pixel_size))
     return d
 
+def _append_image_if_available(d, x, y, w, h, obj):
+    """Append the object's PNG only when the file actually exists.
+
+    The optimized archive stores no high-mag images, so obj.png can point at a
+    file that was never copied; draw.Image would raise FileNotFoundError.
+    """
+    if obj.is_aws or (obj.png and os.path.isfile(obj.png)):
+        d.append(draw.Image(x, y, w, h, path=obj.png, embed=not obj.is_aws))
+
+
 def drawHighMag(highmag) -> draw.Drawing:
     d = draw.Drawing(highmag.shape_y, highmag.shape_x, id=f'{highmag.name}-svg', displayInline=False, style_='height: 100%; width: 100%')
-    d.append(draw.Image(0, 0, d.width, d.height, path=highmag.png, embed= not highmag.is_aws))
+    _append_image_if_available(d, 0, 0, d.width, d.height, highmag)
     d.append(add_scale_bar(highmag.pixel_size, d.width, d.height, id_type=highmag.name))
     return d
 
 
 def drawSelector(obj, selector_sorter) -> draw.Drawing:
     d = draw.Drawing(obj.shape_y, obj.shape_x, id='selector-svg', displayInline=False, style_='height: 100%; width: 100%')
-    d.append(draw.Image(0, 0, d.width, d.height, path=obj.png, embed= not obj.is_aws))
+    _append_image_if_available(d, 0, 0, d.width, d.height, obj)
 
     shapes = draw.Group(id='selectorShapes')
 
@@ -386,5 +397,5 @@ def drawBase(obj, padding_fraction=0.25) -> draw.Drawing:
     padded_img_size = [obj.shape_x * (1 + padding_fraction), obj.shape_y * (1 + padding_fraction)]
     d = draw.Drawing(*padded_img_size, id=f'{obj.pk}-svg', displayInline=False, style_='height: 100%; width: 100%')
     d.append(draw.Rectangle(0, 0, *padded_img_size, stroke_width=floor(d.width / 100), stroke='black', fill='black', fill_opacity=0))
-    d.append(draw.Image((padded_img_size[0]-obj.shape_x)//2, (padded_img_size[1]-obj.shape_y)//2, obj.shape_x, obj.shape_y, path=obj.png, embed= not obj.is_aws))
+    _append_image_if_available(d, (padded_img_size[0]-obj.shape_x)//2, (padded_img_size[1]-obj.shape_y)//2, obj.shape_x, obj.shape_y, obj)
     return d

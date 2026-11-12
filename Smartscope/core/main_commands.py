@@ -8,6 +8,7 @@ from django.core.cache import cache
 from Smartscope.core.test_commands import *
 from Smartscope.core.utils.training_data import add_to_training_set
 from Smartscope.core.export_optics import export_optics
+from Smartscope.core.optimize_import import optimize_import
 from .autoscreen import autoscreen, run_protocol_command
 
 import numpy as np
