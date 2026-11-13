@@ -52,13 +52,19 @@
         <div class="navbar-collapse collapse d-flex flex-row justify-content-between" id="navbarNav">
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item">
+                    {% if USE_MICROSCOPE %}
                     <a class="nav-link " id="browse" href="{% url 'browser' %}">Session Browser</a>
+                    {% else %}
+                    <a class="nav-link " id="archive_view" href="{% url 'browser' %}">Session Viewer</a>
+                    {% endif %}
                 </li>
-                {% if USE_MICROSCOPE %}
                 <li class="nav-item">
+                    {% if USE_MICROSCOPE %}
                     <a class="nav-link" id="run" href="{% url 'run' %}">Run Smartscope</a>
+                    {% else %}
+                    <a class="nav-link" id="archive_browse" href="{% url 'sessionHistory' %}">Session Browser</a>
+                    {% endif %}
                 </li>
-                {% endif %}
             </ul>
             <ul class="navbar-nav">
                 <li class="nav-item d-flex align-items-center">
