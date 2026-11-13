@@ -6,5 +6,10 @@ def get_version():
     return {'VERSION': Path('VERSION').read_text()}
 
 def base_settings(request):
-    # return the value you want as a dictionnary. you may add multiple values in there.
-    return {'USE_MICROSCOPE': settings.USE_MICROSCOPE,} | get_version()
+    role = getattr(settings, 'SMARTSCOPE_ROLE', 'acquisition')
+    return {
+        'USE_MICROSCOPE': settings.USE_MICROSCOPE,
+        'SMARTSCOPE_ROLE': role,
+        'isArchive': role == 'archive',
+        'SHOW_HIGHMAG': getattr(settings, 'SHOW_HIGHMAG', True),
+    } | get_version()

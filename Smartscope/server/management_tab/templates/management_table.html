@@ -1,6 +1,15 @@
 
 <div id="container" class="d-flex flex-column p-2" style="width: 100%; height: 100%; display: flex; flex-direction: column;">
-<h4 class="pt-2 pb-1">Sessions history</h4>
+<div class="d-flex align-items-center justify-content-between pt-2 pb-1">
+    <h4 class="m-0">Session Browser</h4>
+    {% if isArchive %}
+    <div class="d-flex align-items-center gap-2">
+        <button id="toggleSelectBtn" class="btn btn-sm btn-outline-primary">Select Entries to Export</button>
+        <button id="exportSelectedBtn" class="btn btn-sm btn-success d-none">Export Selected (0)</button>
+        <button id="clearSelectionBtn" class="btn btn-sm btn-outline-secondary d-none">Clear</button>
+    </div>
+    {% endif %}
+</div>
 <div id="data-grid" style="flex: 1; width: 100%; min-height: 0;" class="ag-theme-balham"></div>
 </div>
 <script type="text/javascript" charset="utf-8">
@@ -34,7 +43,24 @@ var numberFilter = {
     suppressAndOrCondition: true,
     filterOptions: ["equals", "greaterThan", "lessThan"],
 };
-
+{% if isArchive %}
+var columnDefs = [
+    {headerName: "", colId: "__select", width: 44, minWidth: 44, maxWidth: 44,
+     pinned: "left", sortable: false, filter: false, resizable: false, hide: true,
+     cellRenderer: selectionRenderer,
+     cellStyle: {display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0}},
+    {headerName: "Session", field: "session_label", filter: "agTextColumnFilter", cellRenderer: sessionLinkRenderer},
+    {headerName: "Grid", field: "grid_name", filter: "agTextColumnFilter", filterParams: textFilter},
+    {headerName: "Date", field: "date", filter: "agTextColumnFilter", filterParams: textFilter},
+    {headerName: "Microscope", field: "microscope", filter: "agTextColumnFilter", filterParams: textFilter},
+    {headerName: "Detector", field: "detector", filter: "agTextColumnFilter", filterParams: textFilter},
+    {headerName: "HoleType", field: "holeType", filter: "agTextColumnFilter", filterParams: textFilter},
+    {headerName: "SessionType", field: "session_type", filter: "agTextColumnFilter"},
+    {headerName: "Status", field: "status", filter: "agTextColumnFilter", filterParams: textFilter},
+    {headerName: "#SquaresAcquired", field: "squares_acquired", filter: "agNumberColumnFilter", filterParams: numberFilter},
+    {headerName: "#HolesAcquired", field: "holes_acquired", filter: "agNumberColumnFilter", filterParams: numberFilter},
+];
+{% else %}
 var columnDefs = [
     {headerName: "Session", field: "session_label", filter: "agTextColumnFilter", cellRenderer: sessionLinkRenderer},
     {headerName: "Group", field: "group", filter: "agTextColumnFilter", filterParams: textFilter},
@@ -47,23 +73,30 @@ var columnDefs = [
     {headerName: "#Grids.Good", field: "grid_good", filter: "agNumberColumnFilter", filterParams: numberFilter},
     {headerName: "#Grids.Bad", field: "grid_bad", filter: "agNumberColumnFilter", filterParams: numberFilter},
 ];
-
+{% endif %}
 var gridOptions = {
     columnDefs: columnDefs,
     defaultColDef: {
         filterParams: {suppressAndOrCondition: true, filterOptions: ["contains"]},
         resizable: true,
-        enableCellTextSelection: true,  // allows copying text from cells
+        enableCellTextSelection: true,
     },
-    enableCellTextSelection: true,  // allows copying text from cells
+    enableCellTextSelection: true,
     rowModelType: "infinite",
+    rowClassRules: {
+        'export-selected': function (params) {
+            return !!(params.data && selectedGrids.has(params.data.grid_id));
+        }
+    },
     cacheBlockSize: 100,
     maxBlocksInCache: 10,
     datasource: {
         getRows: function(params) {
             var filtering = encodeURIComponent(JSON.stringify(params.filterModel));
             var sorting = encodeURIComponent(JSON.stringify(params.sortModel));
-            var url = `/sessions_history/sessions/?startRow=${params.startRow}&endRow=${params.endRow}&filter=${filtering}&sort=${sorting}`;
+            //var url = `/sessions_history/sessions/?startRow=${params.startRow}&endRow=${params.endRow}&filter=${filtering}&sort=${sorting}`;
+            var dataUrl = {{ isArchive|yesno:"true,false" }} ? "/sessions_history/grids/" : "/sessions_history/sessions/";
+            var url = `${dataUrl}?startRow=${params.startRow}&endRow=${params.endRow}&filter=${filtering}&sort=${sorting}`;
             fetch(url)
                 .then((response) => response.json())
                 .then((data) => {
@@ -78,7 +111,97 @@ var gridOptions = {
 
 var gridDiv = document.querySelector("#data-grid");
 var gridApi = agGrid.createGrid(gridDiv, gridOptions);
+
+var toggleBtn = document.getElementById('toggleSelectBtn');
+if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+        selectionMode = !selectionMode;
+        gridApi.setColumnsVisible(['__select'], selectionMode);
+        toggleBtn.textContent = selectionMode ? 'Done selecting' : 'Select Entries to Export';
+        toggleBtn.classList.toggle('btn-outline-primary', !selectionMode);
+        toggleBtn.classList.toggle('btn-primary', selectionMode);
+        document.getElementById('exportSelectedBtn').classList.toggle('d-none', !selectionMode);
+        document.getElementById('clearSelectionBtn').classList.toggle('d-none', !selectionMode);
+        gridApi.sizeColumnsToFit();
+    });
+
+    document.getElementById('clearSelectionBtn').addEventListener('click', function () {
+        selectedGrids.clear();
+        updateExportButton();
+        gridApi.redrawRows();
+    });
+
+    document.getElementById('exportSelectedBtn').addEventListener('click', exportSelected);
+}
+
+async function exportSelected() {
+    if (selectedGrids.size === 0) { alert('No entries selected.'); return; }
+    var btn = document.getElementById('exportSelectedBtn');
+    try {
+        btn.disabled = true;
+        btn.textContent = 'Preparing…';
+        const response = await fetch('/sessions_history/export/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
+            body: JSON.stringify({grid_ids: Array.from(selectedGrids)})
+        });
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const total = Number(response.headers.get('Content-Length')) || 0;
+        const reader = response.body.getReader();
+        const chunks = []; let received = 0;
+        while (true) {
+            const {done, value} = await reader.read();
+            if (done) break;
+            chunks.push(value); received += value.length;
+            btn.textContent = total
+                ? `Downloading ${Math.round(received / total * 100)}%`
+                : `Downloading ${(received / 1048576).toFixed(1)} MB`;
+        }
+        const url = URL.createObjectURL(new Blob(chunks));
+        const a = document.createElement('a');
+        a.href = url; a.download = 'smartscope_export.zip';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        alert('Export failed: ' + err.message);
+    } finally {
+        btn.disabled = false;
+        updateExportButton();
+    }
+}
+
 setTimeout(() => gridApi.sizeColumnsToFit(), 100);
+
+var CSRF_TOKEN = "{{ csrf_token }}";
+var selectedGrids = new Set();
+var selectionMode = false;
+
+function updateExportButton() {
+    var btn = document.getElementById('exportSelectedBtn');
+    if (btn) btn.textContent = `Export Selected (${selectedGrids.size})`;
+}
+
+function selectionRenderer(params) {
+    if (!params.data) return '';
+    var id = params.data.grid_id;
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;width:100%;';
+
+    var input = document.createElement('input');
+    input.type = 'checkbox';
+    input.className = 'form-check-input';
+    input.style.cssText = 'margin:0;cursor:pointer;float:none;vertical-align:middle;';
+    input.checked = selectedGrids.has(id);
+    input.addEventListener('change', function () {
+        if (input.checked) selectedGrids.add(id); else selectedGrids.delete(id);
+        updateExportButton();
+        gridApi.redrawRows({ rowNodes: [params.node] });
+    });
+
+    wrap.appendChild(input);
+    return wrap;
+}
 })();
 </script>
 <style>
@@ -97,5 +220,16 @@ setTimeout(() => gridApi.sizeColumnsToFit(), 100);
     font-size: 12px;
     font-weight: 500;
     line-height: 1.5;
+}
+
+.ag-theme-balham .ag-cell[col-id="__select"] {
+    padding: 0 !important;
+    line-height: normal !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+.ag-theme-balham .ag-cell[col-id="__select"] input[type="checkbox"] {
+    margin: 0 !important;
 }
 </style>

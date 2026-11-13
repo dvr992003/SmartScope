@@ -14,15 +14,34 @@ from Smartscope.core.models.screening_session import ScreeningSession
 from Smartscope.core.models.grid import AutoloaderGrid
 from Smartscope.core.settings import server_docker
 # from core.models import Product
+from django.conf import settings
+from rest_framework.exceptions import PermissionDenied
+from .serializers import SessionSerializer, GridSerializer
+from django.db.models import OuterRef, Subquery, IntegerField
+from django.db.models.functions import Coalesce
+from Smartscope.core.models.square import SquareModel
+from Smartscope.core.models.hole import HoleModel
+import tempfile, zipfile
+from pathlib import Path
+from django.http import FileResponse
+
 
 
 logger = logging.getLogger(__name__)
 
 
-FILTER_FIELD_MAP = {
-    "group": "group__name",
-    "microscope": "microscope_id__name",
-    "user": "user__username",
+def _is_archive():
+    return getattr(settings, "SMARTSCOPE_ROLE", "acquisition") == "archive"
+
+GRID_FILTER_FIELD_MAP = {
+    "date": "session_id__date",
+    "microscope": "session_id__microscope_id__name",
+    "detector": "session_id__detector_id__detector_model",
+    "holeType": "holeType_id",
+    "session_type": "collection_mode",
+    "grid_name": "name",
+    "squares_acquired": "squares_acquired",
+    "holes_acquired": "holes_acquired",
 }
 
 def table_view(request):
@@ -44,6 +63,12 @@ def utc_time_conversion(date: str,):
     local_dt = naive_dt.replace(tzinfo=ZoneInfo(server_docker.TIME_ZONE))
     return local_dt.astimezone(ZoneInfo("UTC"))
         
+def _completed_count(model):
+    return Coalesce(Subquery(
+        model.objects.filter(grid_id=OuterRef('pk'), status='completed')
+             .values('grid_id').annotate(c=Count('*')).values('c')[:1],
+        output_field=IntegerField(),
+    ), 0)
 
 class SessionsListView(APIView):
     # permission_classes = [permissions.IsAuthenticated]
@@ -115,8 +140,10 @@ class SessionsListView(APIView):
                 queryset = queryset.order_by(*sort_fields)
 
         return queryset
-    
-    def get(self,request, *args, **kwargs):
+
+    def get(self, request, *args, **kwargs):
+        if _is_archive():
+            raise PermissionDenied("Session list is not available in archive role.")
         start_row = int(request.GET.get("startRow", 0))
         end_row = int(request.GET.get("endRow", 100))
         user = request.user
@@ -134,4 +161,103 @@ class SessionsListView(APIView):
 
         serializer = SessionSerializer(page, many=True)
         return Response({"rows": serializer.data, "totalRows": total_rows})
-    
+
+class GridsListView(APIView):
+
+    def get_queryset(self):
+        qs = (AutoloaderGrid.objects
+              .select_related("session_id", "session_id__group",
+                              "session_id__microscope_id", "session_id__detector_id",
+                              "holeType")
+              .annotate(
+            squares_acquired=_completed_count(SquareModel),
+            holes_acquired=_completed_count(HoleModel),
+        )
+              .order_by("-session_id__creation_time", "position"))
+
+        filter_params = self.request.GET.get("filter")
+        if filter_params:
+            q_objects = []
+            for key, info in json.loads(filter_params).items():
+                ftype, fval = info.get("type"), info.get("filter")
+                if fval is None:
+                    continue
+                if key == "session_label":
+                    q_objects.append(Q(session_id__session__icontains=fval) |
+                                     Q(session_id__date__icontains=fval))
+                    continue
+                db_field = GRID_FILTER_FIELD_MAP.get(key, key)
+                if ftype == "contains":
+                    q_objects.append(Q(**{f"{db_field}__icontains": fval}))
+                elif ftype == "equals":
+                    q_objects.append(Q(**{f"{db_field}__exact": fval}))
+            qs = qs.filter(*q_objects)
+
+        sort_params = self.request.GET.get("sort")
+        if sort_params:
+            sort_fields = []
+            for s in json.loads(sort_params):
+                key = GRID_FILTER_FIELD_MAP.get(s["colId"], s["colId"])
+                if s["colId"] == "session_label":
+                    key = "session_id__session"
+                sort_fields.append(key if s["sort"] == "asc" else f"-{key}")
+            if sort_fields:
+                qs = qs.order_by(*sort_fields)
+        return qs
+
+    def get(self, request, *args, **kwargs):
+        if not _is_archive():
+            raise PermissionDenied("Grid list is only available in archive role.")
+        start = int(request.GET.get("startRow", 0))
+        end = int(request.GET.get("endRow", 100))
+        qs = self.get_queryset()
+        if not request.user.is_staff:
+            qs = qs.filter(session_id__group__in=request.user.groups.values_list("name", flat=True))
+        total = qs.count()
+        page = qs[start:end]
+        return Response({"rows": GridSerializer(page, many=True).data, "totalRows": total})
+
+class GridsExportView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        if not _is_archive():
+            raise PermissionDenied("Export is only available in archive role.")
+
+        grid_ids = request.data.get("grid_ids") or []
+        if not grid_ids:
+            return Response({"detail": "No grids selected."}, status=400)
+
+        qs = (AutoloaderGrid.objects
+              .select_related("session_id")
+              .filter(grid_id__in=grid_ids))
+        if not request.user.is_staff:
+            qs = qs.filter(session_id__group__in=request.user.groups.values_list("name", flat=True))
+
+        # SpooledTemporaryFile: RAM hasta 64MB, luego disco; se borra al cerrarse.
+        buf = tempfile.SpooledTemporaryFile(max_size=64 * 1024 * 1024)
+        written = 0
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+            for grid in qs:
+                gdir = Path(grid.directory)
+                if not gdir.is_dir():
+                    continue
+                s = grid.session_id
+                base = f"{s.date}_{s.session}/{grid.position}_{grid.name}"
+                yml = gdir / "export.yaml"
+                if yml.is_file():
+                    zf.write(yml, f"{base}/export.yaml")
+                    written += 1
+                pngs = gdir / "pngs"
+                if pngs.is_dir():
+                    for f in sorted(pngs.iterdir()):
+                        if f.is_file():
+                            zf.write(f, f"{base}/pngs/{f.name}")
+                            written += 1
+
+        if written == 0:
+            return Response({"detail": "Nothing to export."}, status=404)
+
+        buf.seek(0)
+        filename = f"smartscope_export_{qs.count()}grids.zip"
+        return FileResponse(buf, as_attachment=True, filename=filename,
+                            content_type="application/zip")
