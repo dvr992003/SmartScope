@@ -2,6 +2,7 @@
 {% load static %}
 <div class="card holeCard mapCard" targets="{{instance.targets_prefix}}">
     {% include "mapcard/card_header.html" %}
+    {% if USE_MICROSCOPE %}
     <nav class=" card-header py-0 navbar navbar-expand-xl navbar-light bg-light" role="navigation">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#atlasNavBar">
             <span class="navbar-toggler-icon"></span>
@@ -54,6 +55,7 @@
             </ul>
         </div>
     </nav>
+    {% endif %}
 
     <div class="d-flex h-100 w-100 m-0 p-0 justify-content-center align-items-center">
         <div id="{{instance.prefix}}_im" class="d-flex w-100 h-100 justify-content-center">
@@ -62,8 +64,9 @@
     </div>
 
     <div class="card-footer py-1">
-        <p class="card-text text-start m-0"><small class="text-muted">Completion time:
-                {{instance.completion_time |date:'Y-m-d, H:i:s'}}</small></p>
+        <p class="card-text text-start m-0"><small class="text-muted">
+            {% if USE_MICROSCOPE %}Completion time: {{instance.completion_time |date:'Y-m-d, H:i:s'}}
+            {% else %} Acquisition date: {{instance.completion_time |date:'Y-m'}}{% endif %} </small></p>
     </div>
 </div>
 
