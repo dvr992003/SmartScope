@@ -5,12 +5,13 @@
     <div class="dropdown-menu">
         <div class="div" id="quality">
             <h6 class="dropdown-header">Download</h6>
-
+            {% if USE_MICROSCOPE %}
             <a id='opt-mrc' class="dropdown-item" data-bs-toggle="tooltip" data-bs-placement="left"
                 title="Download mrc"
                 href="/api/{{instance.api_viewset_name}}/{{instance.id}}/download/?extension=mrc">
                 .mrc
             </a>
+            {% endif %}
             <a id='opt-png' class="dropdown-item" data-bs-toggle="tooltip" data-bs-placement="left"
                 title="Download png"
                 href="/api/{{instance.api_viewset_name}}/{{instance.id}}/download/?extension=png">
@@ -20,11 +21,13 @@
                 title="Download png with overlays" href="#">
                 .png + overlay
             </a>
+            {% if USE_MICROSCOPE %}
             <a id='opt-raw' class="dropdown-item" data-bs-toggle="tooltip" data-bs-placement="left"
                 title="Download raw file saved by the scope"
                 href="/api/{{instance.api_viewset_name}}/{{instance.id}}/download/?extension=raw">
                 raw
             </a>
+            {% endif %}
         </div>
     </div>
 </div>
