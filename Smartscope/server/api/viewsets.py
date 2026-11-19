@@ -844,7 +844,7 @@ class HoleModelViewSet(viewsets.ModelViewSet, GeneralActionsMixin, ExtraActionsM
         for hole in queryset:
             context['hole']=hole
             context['svg'] = hole.svg().as_svg()
-            response_context['cards'].append(render_to_string('holecard.html',context))
+            response_context['cards'].append(render_to_string('holecard.html', context, request=request))
         resp = SimpleTemplateResponse(context=response_context, content_type='text/html', template='holecards.html')
         logger.debug(resp)
         return resp

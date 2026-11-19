@@ -49,10 +49,10 @@ REDIS_PASSWORD = os.getenv('REDIS_PASSWORD', None)
 _is_archive = SMARTSCOPE_ROLE == 'archive'
 if _is_archive:
     USE_MICROSCOPE = False
-    SHOW_HIGHMAG = False
+    SHOW_HIGHMAG = True
 else:
     USE_MICROSCOPE = eval(os.getenv('USE_MICROSCOPE', 'True'))
-    SHOW_HIGHMAG = eval(os.getenv('SHOW_HIGHMAG', 'True'))
+    SHOW_HIGHMAG = os.getenv('SHOW_HIGHMAG', 'True').strip().lower() in ('1', 'true', 'yes')
 if USE_LONGTERMSTORAGE:
     AUTOSCREENSTORAGE = os.getenv('AUTOSCREENSTORAGE')
 else:

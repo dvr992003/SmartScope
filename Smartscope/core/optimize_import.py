@@ -5,8 +5,7 @@ For one grid export it:
   1. reads the export YAML from a source working directory,
   2. ANONYMIZES System A's identity (who / where / when / which machine),
   3. imports the depurated metadata into this instance's database,
-  4. copies the slim PNGs (everything except the *_hm micrograph images) into the
-     optimized store, under the ANONYMIZED layout the viewer resolves,
+  4. copies the slim PNGs into the optimized store, under the ANONYMIZED layout the viewer resolves,
   5. writes the grid's export.yaml next to those PNGs (the portable, downloadable copy).
 
 Anonymization and import are both IDEMPOTENT and DETERMINISTIC: re-running for the
@@ -34,8 +33,6 @@ from pathlib import Path
 import yaml
 
 logger = logging.getLogger(__name__)
-
-HIGHMAG_SUFFIXES = ("_hm.png", "_hm.webp")
 
 _TIMESTAMP_KEYS = frozenset({
     "creation_time", "start_time", "last_update",
@@ -137,16 +134,13 @@ def _copy_slim_pngs(src_pngs: Path, dst_pngs: Path) -> tuple:
         return 0, 0
 
     dst_pngs.mkdir(parents=True, exist_ok=True)
-    copied = skipped = 0
+    copied = 0
     for img in src_pngs.iterdir():
         if not img.is_file() or img.suffix.lower() not in (".png", ".webp"):
             continue
-        if img.name.endswith(HIGHMAG_SUFFIXES):
-            skipped += 1
-            continue
         shutil.copy2(img, dst_pngs / img.name)
         copied += 1
-    return copied, skipped
+    return copied, 0
 
 
 def _as_bool(value, default: bool) -> bool:

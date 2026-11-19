@@ -30,30 +30,35 @@
         </div>
         <div class="card-img-top ">
             <div class="div row mw-100 m-0 p-0 justify-content-center">
-                <div class="col-12 col-md-6 p-0 d-flex align-items-center justify-content-center">
+                <div class="col-12 {% if not isArchive %}col-md-6{% endif %} p-0 d-flex align-items-center justify-content-center">
                     <div class="w-100">
                         {{svg | safe }}
                     </div>
                 </div>
+                {% if not isArchive %}
                 <div class="col-12 col-md-6 p-0 d-flex align-items-center justify-content-center">
                     <img class="w-100" src="{{hole.power_spectrum | safe}}">
                 </div>
+                {% endif %}
             </div>
         </div>
         <div class="card-body">
             <p class="card-text text-left m-0">Pixel size: {{hole.pixel_size|floatformat:2}} &#8491;</p>
+            {% if not isArchive %}
             <p class="card-text text-left m-0">Defocus: {{hole.defocus|floatformat:0}} &#8491;</p>
             <p class="card-text text-left m-0">CTFfit: {{hole.ctffit|floatformat:1}} &#8491;</p>
             <p class="card-text text-left m-0">Astig: {{hole.astig|floatformat:0}} &#8491;</p>
             <p class="card-text text-left m-0">Astig Angle: {{hole.angast|floatformat:0}} &#176;</p>
+            {% endif %}
             <p class="card-text text-left m-0">Ice thickness: {{hole.ice_thickness}} nm</p>
-            <!-- <p class="card-text text-left m-0">Tilt angle: {{hole.tilt_angle|floatformat:1}} &#176;</p> -->
             <p class="card-text text-left m-0">Targeting offset: {{hole.offset|floatformat:1}} &mu;m;</p>
         </div>
         <div class="card-footer py-1">
+            {% if not isArchive %}
             <p class="card-text text-start m-0"><small class="text-muted">Frames: {{hole.frames}}</small></p>
-            <p class="card-text text-start m-0"><small class="text-muted">Completion time:
-                    {{hole.hole_id.completion_time |date:'Y-m-d, H:i:s'}}</small></p>
+            {% endif %}
+            <p class="card-text text-start m-0"><small class="text-muted">{% if isArchive %} Acquisition date: {% else %} Completion time: {% endif %}
+                {% if isArchive %}{{hole.hole_id.completion_time|date:'Y-m'}}{% else %}{{hole.hole_id.completion_time|date:'Y-m-d, H:i:s'}}{% endif %}</small></p>
         </div>
 
     </div>

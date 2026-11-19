@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}Smartscope Browser{% endblock %}
 {% block content %}
-    <div id="sideNav" class="d-flex flex-column p-0 justify-content-between">
+    <div id="sideNav" data-archive="{{ isArchive|yesno:'true,false' }}" class="d-flex flex-column p-0 justify-content-between">
         <ul class="list-group px-0">
             <li class="list-group-item p-1" data-bs-toggle="tooltip" title="Toggle nagivation menu">
                 <button id="sidebarCollapse"

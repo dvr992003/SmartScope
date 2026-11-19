@@ -9,6 +9,7 @@ $(document).ready(async function () {
     toggleSearchBar('sidebarSessions')
     toggleCheckboxLabel()
     initBrowser()
+    syncArchiveSidebar()
     adjustThirdSection()
     $(window).on('resize', adjustThirdSection)
 })
@@ -22,6 +23,8 @@ document.addEventListener('htmx:historyRestore', async function() {
     selected()
     toggleCheckboxLabel()
     initBrowser()
+    lastArchiveInBrowser = null
+    syncArchiveSidebar()
     adjustThirdSection()
 })
 
@@ -157,6 +160,19 @@ function setSidebarOpen(open) {
         $('#sidebar-resizer').hide()
     }
 }
+
+let lastArchiveInBrowser = null
+
+function syncArchiveSidebar() {
+    if (document.getElementById('sideNav')?.dataset.archive !== 'true') return
+    const inBrowser = window.location.pathname.startsWith('/sessions_history')
+    if (inBrowser === lastArchiveInBrowser) return
+    lastArchiveInBrowser = inBrowser
+    setSidebarOpen(!inBrowser)
+}
+
+document.addEventListener('htmx:pushedIntoHistory', syncArchiveSidebar)
+document.addEventListener('htmx:afterSettle', syncArchiveSidebar)
 
 function getScrollMaxHeight($section, sectionHeight) {
     const titleHeight = $section.find('.sidebar-separator-title').outerHeight(true) || 0
