@@ -37,11 +37,21 @@ GRID_FILTER_FIELD_MAP = {
     "date": "session_id__date",
     "microscope": "session_id__microscope_id__name",
     "detector": "session_id__detector_id__detector_model",
-    "holeType": "holeType_id",
+    "holeType": "holeType__name",
     "session_type": "collection_mode",
     "grid_name": "name",
     "squares_acquired": "squares_acquired",
     "holes_acquired": "holes_acquired",
+}
+NUMERIC_GRID_FIELDS = {"squares_acquired", "holes_acquired"}
+LOOKUPS = {"contains": "icontains", "equals": "exact",
+           "greaterThan": "gt", "lessThan": "lt"}
+
+FILTER_FIELD_MAP = {
+    "group": "group__name",
+    "microscope": "microscope_id__name",
+    "user": "user__username",
+    "detector": "detector_id__detector_model",
 }
 
 def table_view(request):
@@ -180,17 +190,21 @@ class GridsListView(APIView):
             q_objects = []
             for key, info in json.loads(filter_params).items():
                 ftype, fval = info.get("type"), info.get("filter")
-                if fval is None:
+                if fval is None or fval == "":
                     continue
                 if key == "session_label":
                     q_objects.append(Q(session_id__session__icontains=fval) |
                                      Q(session_id__date__icontains=fval))
                     continue
-                db_field = GRID_FILTER_FIELD_MAP.get(key, key)
-                if ftype == "contains":
-                    q_objects.append(Q(**{f"{db_field}__icontains": fval}))
-                elif ftype == "equals":
-                    q_objects.append(Q(**{f"{db_field}__exact": fval}))
+                if key in NUMERIC_GRID_FIELDS:
+                    try:
+                        fval = int(fval)
+                    except (TypeError, ValueError):
+                        continue
+                lookup = LOOKUPS.get(ftype)
+                if lookup:
+                    db_field = GRID_FILTER_FIELD_MAP.get(key, key)
+                    q_objects.append(Q(**{f"{db_field}__{lookup}": fval}))
             qs = qs.filter(*q_objects)
 
         sort_params = self.request.GET.get("sort")

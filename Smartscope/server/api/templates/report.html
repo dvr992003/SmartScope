@@ -44,6 +44,7 @@
         </div>
     </div>
     <div class="d-flex align-items-stretch justify-content-between mx-0 px-0 mt-1">
+        {% if not isArchive %}
         <div class="col-6">
             <form id='editNotesForm' action='#'>
                     <div class="input-group">
@@ -60,6 +61,7 @@
                 Start Job
             </button> -->
         </div>
+        {% endif %}
         <div class='d-flex flex-wrap align-items-stretch justify-content-end gap-1'>
             {% if not isArchive %}
             <button id='gridParamBtn' class="btn btn-sm btn-outline-primary col-3 col-md-auto" type="button"
