@@ -6,7 +6,7 @@
 services:
   smartscope:
     environment:
-      SMARTSCOPE_ROLE: ${SMARTSCOPE_ROLE:-archive}
+      SMARTSCOPE_ROLE: ${SMARTSCOPE_ROLE:-acqusition}
     image: ghcr.io/smartscope-org/smartscope:latest
     restart: always
     volumes:

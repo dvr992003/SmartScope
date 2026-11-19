@@ -41,7 +41,7 @@ setRole () {
             *) echo "Unknown role '$1'. Use 'archive' or 'acquisition'."; exit 1 ;;
         esac
     fi
-    echo "Role: ${SMARTSCOPE_ROLE:-archive (default)}"
+    echo "Role: ${SMARTSCOPE_ROLE:-acquisition (default)}"
 }
 
 stop () {
