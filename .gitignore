@@ -80,3 +80,4 @@ Docker/SmartScope/db/
 Docker/SmartScope/optimized_store/
 Docker/SmartScope/backups/
 Docker/SmartScope/scratch/
+Docker/SmartScope/smartscope.yml
