@@ -47,6 +47,7 @@ class GridSerializer(serializers.ModelSerializer):
     grid_name = serializers.CharField(source="name", read_only=True)
     squares_acquired = serializers.IntegerField(read_only=True)
     holes_acquired = serializers.IntegerField(read_only=True)
+    grid_quality = serializers.CharField(source="quality", read_only=True)
 
     def get_session_label(self, obj):
         s = obj.session_id
@@ -61,5 +62,5 @@ class GridSerializer(serializers.ModelSerializer):
         fields = [
             "grid_id", "grid_name", "session_label", "session_id", "group_id",
             "date", "microscope", "detector", "holeType", "session_type",
-            "status", "squares_acquired", "holes_acquired",
+            "status", "squares_acquired", "holes_acquired", "grid_quality",
         ]

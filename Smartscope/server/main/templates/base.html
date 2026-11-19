@@ -34,6 +34,30 @@
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.11" integrity="sha384-0gxUXCCR8yv9FM2b+U3FDbsKthCI66oH5IA9fHppQq9DDMHuMauqq1ZHBpJxQ0J0" crossorigin="anonymous"></script>
 
+    {% if isArchive %}
+    <style>
+        :root {
+            --archive-bg: #332e2b;
+        }
+
+        .navbar.bg-dark,
+        #sideNav,
+        #sidebar-container,
+        .sidebar-separator-title,
+        .sidebar-separator,
+        .logo-separator {
+            background-color: var(--archive-bg) !important;
+        }
+        #sidebar-container .list-group-item,
+        #sidebar-container .list-group-item.active {
+            background-color: var(--archive-bg) !important;
+        }
+        .section-resizer,
+        #sidebarGroups::-webkit-scrollbar-track,
+        #sidebarSessions::-webkit-scrollbar-track
+
+    </style>
+    {% endif %}
 
 </head>
 
@@ -50,16 +74,21 @@
             <span class="navbar-toggler-icon"></span>
         </button> -->
         <div class="navbar-collapse collapse d-flex flex-row justify-content-between" id="navbarNav">
+            {% if isArchive %}
+            <span class="navbar-brand position-absolute top-50 start-50 translate-middle m-0 fs-5 fw-semibold text-nowrap pe-none">
+                Smartscope Archive View
+            </span>
+            {% endif %}
             <ul class="navbar-nav mr-auto">
                 <li class="nav-item">
-                    {% if USE_MICROSCOPE %}
+                    {% if not isArchive %}
                     <a class="nav-link " id="browse" href="{% url 'browser' %}">Session Browser</a>
                     {% else %}
                     <a class="nav-link " id="archive_view" href="{% url 'browser' %}">Session Viewer</a>
                     {% endif %}
                 </li>
                 <li class="nav-item">
-                    {% if USE_MICROSCOPE %}
+                    {% if not isArchive %}
                     <a class="nav-link" id="run" href="{% url 'run' %}">Run Smartscope</a>
                     {% else %}
                     <a class="nav-link" id="archive_browse" href="{% url 'sessionHistory' %}">Archive Browser</a>

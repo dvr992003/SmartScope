@@ -42,6 +42,7 @@ GRID_FILTER_FIELD_MAP = {
     "grid_name": "name",
     "squares_acquired": "squares_acquired",
     "holes_acquired": "holes_acquired",
+    "grid_quality": "quality",
 }
 NUMERIC_GRID_FIELDS = {"squares_acquired", "holes_acquired"}
 LOOKUPS = {"contains": "icontains", "equals": "exact",
