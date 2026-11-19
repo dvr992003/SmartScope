@@ -34,6 +34,16 @@ python                  Runs an interactive ipython shell inside the smartscope 
     echo -e "$OPTIONS"
 }
 
+setRole () {
+    if [ -n "$1" ]; then
+        case "$1" in
+            archive|acquisition) export SMARTSCOPE_ROLE="$1" ;;
+            *) echo "Unknown role '$1'. Use 'archive' or 'acquisition'."; exit 1 ;;
+        esac
+    fi
+    echo "Role: ${SMARTSCOPE_ROLE:-acquisition (default)}"
+}
+
 stop () {
     echo "Stopping smartscope"
     $composeCmd down
@@ -90,6 +100,7 @@ createDirs () {
 
 case $argument in
     start)
+      setRole "$2"
         if checkForUpdates 'latest'; then
             echo "A new release is available. Run 'smartscope.sh update latest' to update to the latest version."
         fi        
@@ -100,6 +111,7 @@ case $argument in
     stop)
         stop;;
     restart)
+      setRole "$2"
         stop
         sleep 2
         start;;
