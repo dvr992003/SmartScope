@@ -307,4 +307,48 @@ async function loadReport(requestfield = null, id = null, push = true) {
     htmx.process(htmx.find('#main'))
 }
 
+function getCsrfToken() {
+    const input = document.querySelector('[name=csrfmiddlewaretoken]')
+    if (input) return input.value
+    const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/)
+    return m ? decodeURIComponent(m[1]) : ''
+}
+
+async function exportGrids(gridIds, includeHighmag = true, btn = null) {
+    if (!gridIds || gridIds.length === 0) { alert('No entries selected.'); return }
+    const original = btn ? btn.textContent : null
+    try {
+        if (btn) { btn.disabled = true; btn.textContent = 'Preparing…' }
+        const response = await fetch('/sessions_history/export/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+            body: JSON.stringify({ grid_ids: gridIds, include_highmag: includeHighmag }),
+        })
+        if (!response.ok) throw new Error('HTTP ' + response.status)
+        const total = Number(response.headers.get('Content-Length')) || 0
+        const reader = response.body.getReader()
+        const chunks = []; let received = 0
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            chunks.push(value); received += value.length
+            if (btn) btn.textContent = total
+                ? `Downloading ${Math.round(received / total * 100)}%`
+                : `Downloading ${(received / 1048576).toFixed(1)} MB`
+        }
+        const cd = response.headers.get('Content-Disposition') || ''
+        const m = cd.match(/filename="?([^";]+)"?/)
+        const url = URL.createObjectURL(new Blob(chunks))
+        const a = document.createElement('a')
+        a.href = url; a.download = m ? m[1] : 'smartscope_export.zip'
+        document.body.appendChild(a); a.click(); a.remove()
+        URL.revokeObjectURL(url)
+    } catch (err) {
+        alert('Export failed: ' + err.message)
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = original }
+    }
+}
+
 

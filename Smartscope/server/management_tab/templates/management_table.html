@@ -5,7 +5,14 @@
     {% if isArchive %}
     <div class="d-flex align-items-center gap-2">
         <button id="toggleSelectBtn" class="btn btn-sm btn-outline-primary">Select Entries to Export</button>
-        <button id="exportSelectedBtn" class="btn btn-sm btn-success d-none">Export Selected (0)</button>
+        <div class="btn-group">
+          <button id="exportSelectedBtn" type="button" class="btn btn-sm btn-success dropdown-toggle d-none"
+                  data-bs-toggle="dropdown" aria-expanded="false">Export Selected (0)</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a id="exportWithHmBtn" class="dropdown-item" href="#">With high-mag images</a></li>
+            <li><a id="exportNoHmBtn" class="dropdown-item" href="#">Without high-mag images</a></li>
+          </ul>
+        </div>
         <button id="clearSelectionBtn" class="btn btn-sm btn-outline-secondary d-none">Clear</button>
     </div>
     {% endif %}
@@ -125,55 +132,29 @@ if (toggleBtn) {
         document.getElementById('clearSelectionBtn').classList.toggle('d-none', !selectionMode);
         gridApi.sizeColumnsToFit();
     });
+        document.getElementById('exportWithHmBtn').addEventListener('click', function (e) {
+        e.preventDefault();
+        exportSelected(true);
+    });
+    document.getElementById('exportNoHmBtn').addEventListener('click', function (e) {
+        e.preventDefault();
+        exportSelected(false);
+    });
 
     document.getElementById('clearSelectionBtn').addEventListener('click', function () {
         selectedGrids.clear();
         updateExportButton();
         gridApi.redrawRows();
     });
-
-    document.getElementById('exportSelectedBtn').addEventListener('click', exportSelected);
 }
 
-async function exportSelected() {
-    if (selectedGrids.size === 0) { alert('No entries selected.'); return; }
-    var btn = document.getElementById('exportSelectedBtn');
-    try {
-        btn.disabled = true;
-        btn.textContent = 'Preparing…';
-        const response = await fetch('/sessions_history/export/', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF_TOKEN},
-            body: JSON.stringify({grid_ids: Array.from(selectedGrids)})
-        });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const total = Number(response.headers.get('Content-Length')) || 0;
-        const reader = response.body.getReader();
-        const chunks = []; let received = 0;
-        while (true) {
-            const {done, value} = await reader.read();
-            if (done) break;
-            chunks.push(value); received += value.length;
-            btn.textContent = total
-                ? `Downloading ${Math.round(received / total * 100)}%`
-                : `Downloading ${(received / 1048576).toFixed(1)} MB`;
-        }
-        const url = URL.createObjectURL(new Blob(chunks));
-        const a = document.createElement('a');
-        a.href = url; a.download = 'smartscope_export.zip';
-        document.body.appendChild(a); a.click(); a.remove();
-        URL.revokeObjectURL(url);
-    } catch (err) {
-        alert('Export failed: ' + err.message);
-    } finally {
-        btn.disabled = false;
-        updateExportButton();
-    }
+async function exportSelected(includeHighmag = true) {
+    await exportGrids([...selectedGrids], includeHighmag, document.getElementById('exportSelectedBtn'));
+    updateExportButton();
 }
 
 setTimeout(() => gridApi.sizeColumnsToFit(), 100);
 
-var CSRF_TOKEN = "{{ csrf_token }}";
 var selectedGrids = new Set();
 var selectionMode = false;
 

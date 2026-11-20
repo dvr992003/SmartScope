@@ -25,8 +25,6 @@ import tempfile, zipfile
 from pathlib import Path
 from django.http import FileResponse
 
-
-
 logger = logging.getLogger(__name__)
 
 
@@ -234,10 +232,12 @@ class GridsListView(APIView):
 
 class GridsExportView(APIView):
 
+    HIGHMAG_SUFFIXES = ("_hm.png", "_hm.webp")
+
     def post(self, request, *args, **kwargs):
         if not _is_archive():
             raise PermissionDenied("Export is only available in archive role.")
-
+        include_hm = str(request.data.get("include_highmag", "true")).lower() in ("1", "true", "yes")
         grid_ids = request.data.get("grid_ids") or []
         if not grid_ids:
             return Response({"detail": "No grids selected."}, status=400)
@@ -265,14 +265,18 @@ class GridsExportView(APIView):
                 pngs = gdir / "pngs"
                 if pngs.is_dir():
                     for f in sorted(pngs.iterdir()):
-                        if f.is_file():
-                            zf.write(f, f"{base}/pngs/{f.name}")
-                            written += 1
+                        if not f.is_file():
+                            continue
+                        if not include_hm and f.name.endswith(self.HIGHMAG_SUFFIXES):
+                            continue
+                        zf.write(f, f"{base}/pngs/{f.name}")
+                        written += 1
 
         if written == 0:
             return Response({"detail": "Nothing to export."}, status=404)
 
         buf.seek(0)
-        filename = f"smartscope_export_{qs.count()}grids.zip"
+        suffix = "" if include_hm else "_no-hm"
+        filename = f"smartscope_export_{qs.count()}grids{suffix}.zip"
         return FileResponse(buf, as_attachment=True, filename=filename,
                             content_type="application/zip")
