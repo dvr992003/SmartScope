@@ -2,18 +2,20 @@
 Optimize + import a SmartScope grid export into THIS (archive-role) instance.
 
 For one grid export it:
-  1. reads the export YAML from a source working directory,
+  1. reads the export YAML from a source working directory and upgrades older
+     export formats (pre-2025-06) to the current one,
   2. ANONYMIZES System A's identity (who / where / when / which machine),
   3. imports the depurated metadata into this instance's database,
-  4. copies the slim PNGs into the optimized store, under the ANONYMIZED layout the viewer resolves,
+  4. copies the PNGs (atlas, squares, holes and high-mag) into the optimized store,
+     under the ANONYMIZED layout the viewer resolves,
   5. writes the grid's export.yaml next to those PNGs (the portable, downloadable copy).
 
 Anonymization and import are both IDEMPOTENT and DETERMINISTIC: re-running for the
 same source grid maps to the same anonymous ids and replaces that grid (DB rows and
 store folder) instead of duplicating it.
 
-The archive instance therefore holds depurated metadata plus the lightweight PNGs,
-but never the heavy high-mag images and never System A's identity. The raw working
+The archive instance therefore holds depurated metadata plus PNGs only: never
+movies, raw/MRC files, CTF images, nor System A's identity. The raw working
 directory is read-only input, never a destination.
 
 CLI (inside the container), via the SmartScope command runner::
@@ -70,14 +72,17 @@ def _coarse_month(value):
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 
+# Coarse timestamps are anchored mid-month (day 15, 12:00 UTC): a first-of-month
+# 00:00 UTC anchor is rendered as the previous month in any timezone west of UTC
+# (the server runs on America/New_York).
 def _coarsen_ts(value):
     ym = _coarse_month(value)
-    return f"{ym[0]:04d}-{ym[1]:02d}-01T00:00:00Z" if ym else value
+    return f"{ym[0]:04d}-{ym[1]:02d}-15T12:00:00Z" if ym else value
 
 
 def _coarse_dt(value):
     ym = _coarse_month(value)
-    return dt.datetime(ym[0], ym[1], 1, tzinfo=dt.timezone.utc) if ym else None
+    return dt.datetime(ym[0], ym[1], 15, 12, 0, tzinfo=dt.timezone.utc) if ym else None
 
 
 def _scrub_tree(node):
@@ -116,6 +121,38 @@ def _anonymize(data: dict, orig_group) -> None:
     detector.update({k: v for k, v in _ANON_DETECTOR.items() if k in detector})
 
     _scrub_tree(data)
+
+
+def _upgrade_legacy_export(data: dict) -> dict:
+    """Bring an older SmartScope export up to the current format, in place.
+
+    1. Exports written before 2025-06 nest children under 'targets'; the current
+       ExportMetaSerializer reads 'targets_export'.
+    2. The same exports repeat every high-mag of a BIS group under each hole of
+       the group (fixed upstream in 637590b). A high-mag is named
+       '<hole name>_<number>_hm', so keep it only under the hole it belongs to.
+
+    Both steps are no-ops on current exports.
+    """
+    stats = {"renamed": 0, "dropped_duplicate_hm": 0}
+
+    def rename(node):
+        if "targets" in node and "targets_export" not in node:
+            node["targets_export"] = node.pop("targets")
+            stats["renamed"] += 1
+
+    for atlas in data.get("atlas") or []:
+        rename(atlas)
+        for square in atlas.get("targets_export") or []:
+            rename(square)
+            for hole in square.get("targets_export") or []:
+                rename(hole)
+                highmags = hole.get("targets_export") or []
+                own = [hm for hm in highmags
+                       if str(hm.get("name", "")) == f"{hole.get('name')}_{hm.get('number')}_hm"]
+                stats["dropped_duplicate_hm"] += len(highmags) - len(own)
+                hole["targets_export"] = own
+    return stats
 
 
 def _find_existing_session(session_data: dict):
@@ -172,7 +209,13 @@ def optimize_import(export_yaml: str,
 
     export_yaml = Path(export_yaml)
     with open(export_yaml) as fh:
-        data = yaml.safe_load(fh)
+        # C loader when available: legacy exports can be >10 MB.
+        data = yaml.load(fh, Loader=getattr(yaml, "CSafeLoader", yaml.SafeLoader))
+
+    stats = _upgrade_legacy_export(data)
+    if stats["renamed"] or stats["dropped_duplicate_hm"]:
+        print(f"Legacy export upgraded: {stats['renamed']} 'targets' keys renamed, "
+              f"{stats['dropped_duplicate_hm']} duplicated high-mags dropped.", flush=True)
 
     raw_session = data["session_id"]
 
@@ -244,7 +287,7 @@ def optimize_import(export_yaml: str,
     if grid_dst.is_dir() and store_root in grid_dst.parents:
         shutil.rmtree(grid_dst)
 
-    copied, skipped = _copy_slim_pngs(src_pngs, dst_pngs)
+    copied, _ = _copy_slim_pngs(src_pngs, dst_pngs)
 
     grid_dst.mkdir(parents=True, exist_ok=True)
     yaml_bytes = YAMLRenderer().render(data=ExportMetaSerializer(instance=obj).data)
@@ -253,7 +296,7 @@ def optimize_import(export_yaml: str,
     action = "Replaced" if replaced else "Imported"
     anon = "anonymized" if anonymize else "RAW (not anonymized)"
     print(f"{action} {orig_wd}/{orig_gdir} -> {wd}/{gdir} "
-          f"(group={group}, {anon}): {copied} PNGs copied, {skipped} high-mag skipped.",
+          f"(group={group}, {anon}): {copied} PNGs copied.",
           flush=True)
     print(f"  metadata -> this DB   |   images + export.yaml -> {grid_dst}", flush=True)
     if copied == 0:
