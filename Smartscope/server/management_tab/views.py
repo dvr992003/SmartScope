@@ -226,6 +226,8 @@ class GridsListView(APIView):
         qs = self.get_queryset()
         if not request.user.is_staff:
             qs = qs.filter(session_id__group__in=request.user.groups.values_list("name", flat=True))
+        if request.GET.get("ids_only"):
+            return Response({"ids": list(qs.values_list("grid_id", flat=True))})
         total = qs.count()
         page = qs[start:end]
         return Response({"rows": GridSerializer(page, many=True).data, "totalRows": total})

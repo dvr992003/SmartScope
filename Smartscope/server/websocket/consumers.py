@@ -5,6 +5,7 @@ import logging
 from Smartscope.core.autoscreen import update
 from Smartscope.core.db_manipulations import viewer_only
 from asgiref.sync import async_to_sync, sync_to_async
+from Smartscope.server.main.archive_guard import is_archive
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,8 @@ class MetadataConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def receive(self, text_data):
+        if is_archive():
+            return
         response = json.loads(text_data)
         user = self.scope["user"]
 
